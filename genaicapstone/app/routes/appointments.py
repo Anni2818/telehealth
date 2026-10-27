@@ -15,7 +15,7 @@ from app.repositories.rescheduling_repository import RescheduleConflict
 #booking requirments
 from app.schemas.appointments import BookingRequest
 from app.services.booking_service import create_booking
-from app.services.appointment_service import list_available_slots
+from app.services.appointment_service import list_available_slots, list_customer_appointments
 
 #cancellation requirments
 from app.schemas.appointments import CancellationRequest
@@ -35,13 +35,21 @@ def get_available_slots(
     requested_date: date = Query(
         description="Appointment date in India time, YYYY-MM-DD"
     ),
+    doctor_code: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=30,
+        description="Optional doctor code, for example DOC-001",
+    ),
 ):
     try:
         slots = list_available_slots(
             specialty=specialty,
             city=city,
             requested_date=requested_date.isoformat(),
+            doctor_code=doctor_code,
         )
+
     except ValueError as error:
         raise HTTPException(
             status_code=400,
@@ -53,9 +61,8 @@ def get_available_slots(
         "slots": slots,
     }
 
-logger = logging.getLogger(__name__)
 
-
+#this is to actually book the slots.
 @router.post("/bookings")
 def book_appointment(request: BookingRequest):
     try:
@@ -170,4 +177,37 @@ def reschedule_appointment(request: RescheduleRequest):
                 "Fetch the appointment's current details "
                 "before deciding whether to retry."
             ),
+        ) from error
+
+
+#this is to get the info about the bookings
+@router.get("/bookings")
+def get_customer_appointments(
+    customer_code: str = Query(
+        min_length=1,
+        max_length=40,
+    ),
+):
+    try:
+        appointments = list_customer_appointments(
+            customer_code=customer_code,
+        )
+
+        return {
+            "count": len(appointments),
+            "appointments": appointments,
+        }
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+    except Exception as error:
+        logger.exception("Listing customer appointments failed.")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Customer appointments could not be retrieved.",
         ) from error
