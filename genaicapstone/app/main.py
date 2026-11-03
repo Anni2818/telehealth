@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.routes.sessions import router as sessions_router
 from app.routes.appointments import router as appointments_router
+from app.routes.actions import router as actions_router
 
 
 app = FastAPI(
@@ -12,6 +13,7 @@ app = FastAPI(
 
 app.include_router(appointments_router)
 app.include_router(sessions_router)
+app.include_router(actions_router)
 
 
 @app.get("/health")
