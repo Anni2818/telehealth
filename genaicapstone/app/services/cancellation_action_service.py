@@ -42,22 +42,23 @@ def _run_cancellation_operation(
 
         cursor.execute(
             """
-            DECLARE @Now DATETIME2(3) = SYSUTCDATETIME();
-
             UPDATE dbo.conversation_sessions
             SET
-                last_activity_at_utc = @Now,
-                expires_at_utc = DATEADD(MINUTE, 30, @Now)
+                last_activity_at_utc = SYSUTCDATETIME(),
+                expires_at_utc = DATEADD(
+                    MINUTE, 30, SYSUTCDATETIME()
+                )
+            OUTPUT INSERTED.session_id
             WHERE session_id = ?
               AND status = 'ACTIVE'
-              AND expires_at_utc > @Now;
-
-            SELECT @@ROWCOUNT;
+              AND expires_at_utc > SYSUTCDATETIME();
             """,
             (str(session_id),),
         )
 
-        if cursor.fetchone()[0] != 1:
+        refreshed_session = cursor.fetchone()
+
+        if refreshed_session is None:
             raise ValueError(
                 "Session expired during the operation. "
                 "Changes were not committed."

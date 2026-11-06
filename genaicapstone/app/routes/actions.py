@@ -22,6 +22,18 @@ from app.services.action_execution_service import (
     execute_booking_action,
 )
 
+from app.schemas.actions import (
+    ExecuteRescheduleRequest,
+    PrepareRescheduleRequest,
+)
+
+from app.repositories.rescheduling_action_repository import (
+    ReschedulingActionConflict,
+)
+from app.services.rescheduling_action_service import (
+    execute_reschedule_action,
+    prepare_reschedule,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +147,60 @@ def prepare_cancellation_action(request: PrepareCancellationRequest):
 def execute_prepared_cancellation(request: ExecuteCancellationRequest):
     return _run_cancellation_route(
         execute_cancellation_action,
+        customer_code=request.customer_code,
+        session_id=request.session_id,
+        action_id=request.action_id,
+        confirmed=request.confirmed,
+    )
+
+
+def _run_rescheduling_route(operation, **arguments):
+    try:
+        return operation(**arguments)
+
+    except (
+        ReschedulingActionConflict,
+        CancellationActionConflict,
+    ) as error:
+        raise HTTPException(
+            status_code=409,
+            detail=str(error),
+        ) from error
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+    except Exception as error:
+        logger.exception("Rescheduling action operation failed.")
+
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Rescheduling result could not be confirmed. "
+                "For an execution retry, reuse the same "
+                "session_id and action_id."
+            ),
+        ) from error
+
+
+@router.post("/reschedules/prepare", status_code=201)
+def prepare_rescheduling_action(request: PrepareRescheduleRequest):
+    return _run_rescheduling_route(
+        prepare_reschedule,
+        customer_code=request.customer_code,
+        session_id=request.session_id,
+        appointment_id=request.appointment_id,
+        new_slot_id=request.new_slot_id,
+    )
+
+
+@router.post("/reschedules/execute")
+def execute_prepared_reschedule(request: ExecuteRescheduleRequest):
+    return _run_rescheduling_route(
+        execute_reschedule_action,
         customer_code=request.customer_code,
         session_id=request.session_id,
         action_id=request.action_id,

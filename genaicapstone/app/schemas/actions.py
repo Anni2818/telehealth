@@ -34,3 +34,21 @@ class ExecuteCancellationRequest(BaseModel):
     session_id: UUID
     action_id: UUID
     confirmed: StrictBool
+
+
+class PrepareRescheduleRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_code: str = Field(min_length=1, max_length=40)
+    session_id: UUID
+    appointment_id: int = Field(gt=0)
+    new_slot_id: int = Field(gt=0)
+
+
+class ExecuteRescheduleRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    customer_code: str = Field(min_length=1, max_length=40)
+    session_id: UUID
+    action_id: UUID
+    confirmed: StrictBool
