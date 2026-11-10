@@ -1,26 +1,23 @@
 import logging
 from datetime import date
-from fastapi import Path
-from fastapi import APIRouter, HTTPException, Query
 
-
-#rescheduling requirments
-from app.schemas.appointments import RescheduleRequest
-from app.services.rescheduling_service import (
-    get_booking_details,
-    reschedule_booking,
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Path,
+    Query,
 )
-from app.repositories.rescheduling_repository import RescheduleConflict
 
-#booking requirments
-from app.schemas.appointments import BookingRequest
-from app.services.booking_service import create_booking
-from app.services.appointment_service import list_available_slots, list_customer_appointments
+from app.services.appointment_service import (
+    list_available_slots,
+    list_customer_appointments,
+)
+from app.services.auth_service import get_current_customer
+from app.services.rescheduling_service import get_booking_details
 
-#cancellation requirments
-from app.schemas.appointments import CancellationRequest
-from app.services.cancellation_service import cancel_booking
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/appointments",
@@ -28,7 +25,26 @@ router = APIRouter(
 )
 
 
-@router.get("/slots")
+def _run_appointment_operation(operation, **arguments):
+    try:
+        return operation(**arguments)
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+    except Exception as error:
+        logger.exception("Appointment read operation failed.")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Appointment information could not be retrieved.",
+        ) from error
+
+
+@router.get("/slots", summary="Search available slots")
 def get_available_slots(
     specialty: str = Query(min_length=1, max_length=100),
     city: str = Query(min_length=1, max_length=100),
@@ -42,19 +58,13 @@ def get_available_slots(
         description="Optional doctor code, for example DOC-001",
     ),
 ):
-    try:
-        slots = list_available_slots(
-            specialty=specialty,
-            city=city,
-            requested_date=requested_date.isoformat(),
-            doctor_code=doctor_code,
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
+    slots = _run_appointment_operation(
+        list_available_slots,
+        specialty=specialty,
+        city=city,
+        requested_date=requested_date.isoformat(),
+        doctor_code=doctor_code,
+    )
 
     return {
         "count": len(slots),
@@ -62,152 +72,249 @@ def get_available_slots(
     }
 
 
-#this is to actually book the slots.
-@router.post("/bookings")
-def book_appointment(request: BookingRequest):
-    try:
-        return create_booking(
-            customer_code=request.customer_code,
-            slot_id=request.slot_id,
-            booking_request_id=request.booking_request_id,
-            confirmed=request.confirmed,
-        )
+@router.get(
+    "/bookings",
+    summary="List the signed-in customer's upcoming appointments",
+)
+def get_customer_appointments(
+    current_customer: dict = Depends(get_current_customer),
+):
+    appointments = _run_appointment_operation(
+        list_customer_appointments,
+        customer_code=current_customer["customer_code"],
+    )
 
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-
-    except Exception as error:
-        logger.exception("Booking operation failed.")
-
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Booking could not be completed. "
-                "Retry with the same booking_request_id."
-            ),
-        ) from error
+    return {
+        "count": len(appointments),
+        "appointments": appointments,
+    }
 
 
-@router.post("/cancellations")
-def cancel_appointment(request: CancellationRequest):
-    try:
-        return cancel_booking(
-            customer_code=request.customer_code,
-            appointment_id=request.appointment_id,
-            confirmed=request.confirmed,
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-
-    except Exception as error:
-        logger.exception("Cancellation operation failed.")
-
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Cancellation could not be completed. "
-                "Retry the same cancellation request."
-            ),
-        ) from error
-
-
-@router.get("/bookings/{appointment_id}")
+@router.get(
+    "/bookings/{appointment_id}",
+    summary="Get one appointment belonging to the signed-in customer",
+)
 def get_appointment_details(
     appointment_id: int = Path(gt=0),
-    customer_code: str = Query(min_length=1, max_length=40),
+    current_customer: dict = Depends(get_current_customer),
 ):
-    try:
-        return get_booking_details(
-            customer_code=customer_code,
-            appointment_id=appointment_id,
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-
-    except Exception as error:
-        logger.exception("Fetching appointment details failed.")
-
-        raise HTTPException(
-            status_code=503,
-            detail="Appointment details could not be retrieved.",
-        ) from error
+    return _run_appointment_operation(
+        get_booking_details,
+        customer_code=current_customer["customer_code"],
+        appointment_id=appointment_id,
+    )
 
 
-@router.post("/reschedules")
-def reschedule_appointment(request: RescheduleRequest):
-    try:
-        return reschedule_booking(
-            customer_code=request.customer_code,
-            appointment_id=request.appointment_id,
-            new_slot_id=request.new_slot_id,
-            expected_row_version=request.expected_row_version,
-            confirmed=request.confirmed,
-        )
-
-    except RescheduleConflict as error:
-        raise HTTPException(
-            status_code=409,
-            detail=str(error),
-        ) from error
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
-
-    except Exception as error:
-        logger.exception("Rescheduling operation failed.")
-
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Rescheduling could not be completed. "
-                "Fetch the appointment's current details "
-                "before deciding whether to retry."
-            ),
-        ) from error
+# import logging
+# from datetime import date
+# from fastapi import Path
+# from fastapi import APIRouter, HTTPException, Query
 
 
-#this is to get the info about the bookings
-@router.get("/bookings")
-def get_customer_appointments(
-    customer_code: str = Query(
-        min_length=1,
-        max_length=40,
-    ),
-):
-    try:
-        appointments = list_customer_appointments(
-            customer_code=customer_code,
-        )
+# #rescheduling requirments
+# from app.schemas.appointments import RescheduleRequest
+# from app.services.rescheduling_service import (
+#     get_booking_details,
+#     reschedule_booking,
+# )
+# from app.repositories.rescheduling_repository import RescheduleConflict
 
-        return {
-            "count": len(appointments),
-            "appointments": appointments,
-        }
+# #booking requirments
+# from app.schemas.appointments import BookingRequest
+# from app.services.booking_service import create_booking
+# from app.services.appointment_service import list_available_slots, list_customer_appointments
 
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        ) from error
+# #cancellation requirments
+# from app.schemas.appointments import CancellationRequest
+# from app.services.cancellation_service import cancel_booking
 
-    except Exception as error:
-        logger.exception("Listing customer appointments failed.")
 
-        raise HTTPException(
-            status_code=503,
-            detail="Customer appointments could not be retrieved.",
-        ) from error
+# router = APIRouter(
+#     prefix="/appointments",
+#     tags=["Appointments"],
+# )
+
+
+# @router.get("/slots")
+# def get_available_slots(
+#     specialty: str = Query(min_length=1, max_length=100),
+#     city: str = Query(min_length=1, max_length=100),
+#     requested_date: date = Query(
+#         description="Appointment date in India time, YYYY-MM-DD"
+#     ),
+#     doctor_code: str | None = Query(
+#         default=None,
+#         min_length=1,
+#         max_length=30,
+#         description="Optional doctor code, for example DOC-001",
+#     ),
+# ):
+#     try:
+#         slots = list_available_slots(
+#             specialty=specialty,
+#             city=city,
+#             requested_date=requested_date.isoformat(),
+#             doctor_code=doctor_code,
+#         )
+
+#     except ValueError as error:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=str(error),
+#         ) from error
+
+#     return {
+#         "count": len(slots),
+#         "slots": slots,
+#     }
+
+
+# #this is to actually book the slots.
+# @router.post("/bookings")
+# def book_appointment(request: BookingRequest):
+#     try:
+#         return create_booking(
+#             customer_code=request.customer_code,
+#             slot_id=request.slot_id,
+#             booking_request_id=request.booking_request_id,
+#             confirmed=request.confirmed,
+#         )
+
+#     except ValueError as error:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=str(error),
+#         ) from error
+
+#     except Exception as error:
+#         logger.exception("Booking operation failed.")
+
+#         raise HTTPException(
+#             status_code=503,
+#             detail=(
+#                 "Booking could not be completed. "
+#                 "Retry with the same booking_request_id."
+#             ),
+#         ) from error
+
+
+# @router.post("/cancellations")
+# def cancel_appointment(request: CancellationRequest):
+#     try:
+#         return cancel_booking(
+#             customer_code=request.customer_code,
+#             appointment_id=request.appointment_id,
+#             confirmed=request.confirmed,
+#         )
+
+#     except ValueError as error:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=str(error),
+#         ) from error
+
+#     except Exception as error:
+#         logger.exception("Cancellation operation failed.")
+
+#         raise HTTPException(
+#             status_code=503,
+#             detail=(
+#                 "Cancellation could not be completed. "
+#                 "Retry the same cancellation request."
+#             ),
+#         ) from error
+
+
+# @router.get("/bookings/{appointment_id}")
+# def get_appointment_details(
+#     appointment_id: int = Path(gt=0),
+#     customer_code: str = Query(min_length=1, max_length=40),
+# ):
+#     try:
+#         return get_booking_details(
+#             customer_code=customer_code,
+#             appointment_id=appointment_id,
+#         )
+
+#     except ValueError as error:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=str(error),
+#         ) from error
+
+#     except Exception as error:
+#         logger.exception("Fetching appointment details failed.")
+
+#         raise HTTPException(
+#             status_code=503,
+#             detail="Appointment details could not be retrieved.",
+#         ) from error
+
+
+# @router.post("/reschedules")
+# def reschedule_appointment(request: RescheduleRequest):
+#     try:
+#         return reschedule_booking(
+#             customer_code=request.customer_code,
+#             appointment_id=request.appointment_id,
+#             new_slot_id=request.new_slot_id,
+#             expected_row_version=request.expected_row_version,
+#             confirmed=request.confirmed,
+#         )
+
+#     except RescheduleConflict as error:
+#         raise HTTPException(
+#             status_code=409,
+#             detail=str(error),
+#         ) from error
+
+#     except ValueError as error:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=str(error),
+#         ) from error
+
+#     except Exception as error:
+#         logger.exception("Rescheduling operation failed.")
+
+#         raise HTTPException(
+#             status_code=503,
+#             detail=(
+#                 "Rescheduling could not be completed. "
+#                 "Fetch the appointment's current details "
+#                 "before deciding whether to retry."
+#             ),
+#         ) from error
+
+
+# #this is to get the info about the bookings
+# @router.get("/bookings")
+# def get_customer_appointments(
+#     customer_code: str = Query(
+#         min_length=1,
+#         max_length=40,
+#     ),
+# ):
+#     try:
+#         appointments = list_customer_appointments(
+#             customer_code=customer_code,
+#         )
+
+#         return {
+#             "count": len(appointments),
+#             "appointments": appointments,
+#         }
+
+#     except ValueError as error:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=str(error),
+#         ) from error
+
+#     except Exception as error:
+#         logger.exception("Listing customer appointments failed.")
+
+#         raise HTTPException(
+#             status_code=503,
+#             detail="Customer appointments could not be retrieved.",
+#         ) from error

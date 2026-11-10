@@ -48,7 +48,10 @@ async def main():
         timeout=60.0,
     ) as http_client:
         async with streamable_http_client(
-            "http://127.0.0.1:8001/mcp",
+            os.getenv(
+                "MCP_TEST_URL",
+                "http://127.0.0.1:8001/mcp",
+            ).strip(),
             http_client=http_client,
         ) as (read_stream, write_stream, _):
             async with ClientSession(
