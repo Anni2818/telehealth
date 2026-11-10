@@ -10,6 +10,7 @@ def get_current_pending_action(
     session_id,
     customer_id,
 ):
+
     action = find_current_pending_action(
         session_id=session_id,
         customer_id=customer_id,
@@ -18,49 +19,54 @@ def get_current_pending_action(
     if action is None:
         return None
 
-    if not action["is_valid"]:
-        return None
+    timezone_id = (
+        action.get("time_zone_id")
+        or "Asia/Kolkata"
+    )
 
-    for field in (
+    local_timezone = ZoneInfo(timezone_id)
+
+    datetime_fields = [
         "created_at_utc",
         "expires_at_utc",
-        "starts_at_utc",
-        "ends_at_utc",
-    ):
+        "current_starts_at_utc",
+        "current_ends_at_utc",
+        "target_starts_at_utc",
+        "target_ends_at_utc",
+    ]
+
+    for field in datetime_fields:
+
         value = action.get(field)
 
-        if isinstance(value, datetime):
-            action[field] = value.replace(
-                tzinfo=timezone.utc
-            ).isoformat()
+        if not isinstance(value, datetime):
+            continue
 
-    if (
-        action["action_type"] == "BOOK"
-        and action.get("time_zone_id")
-        and action.get("starts_at_utc")
-    ):
-        local_timezone = ZoneInfo(
-            action["time_zone_id"]
+        utc_value = value.replace(
+            tzinfo=timezone.utc
         )
 
-        for field in (
-            "starts_at_utc",
-            "ends_at_utc",
-        ):
-            value = action.get(field)
+        action[field] = utc_value.isoformat()
 
-            if value:
-                local_field = field.replace(
-                    "_utc",
-                    "_local",
-                )
+        if field.startswith(("current_", "target_")):
 
-                action[local_field] = (
-                    datetime.fromisoformat(value)
-                    .astimezone(local_timezone)
-                    .isoformat()
-                )
+            local_field = field.replace(
+                "_utc",
+                "_local",
+            )
 
-    action["action_id"] = str(action["action_id"])
+            action[local_field] = (
+                utc_value.astimezone(
+                    local_timezone
+                ).isoformat()
+            )
+
+    action["action_id"] = str(
+        action["action_id"]
+    )
+
+    action["session_id"] = str(
+        action["session_id"]
+    )
 
     return action

@@ -17,6 +17,18 @@ API_URL = os.getenv(
 
 IST = ZoneInfo("Asia/Kolkata")
 
+EXECUTION_ENDPOINTS = {
+    "BOOK": "/actions/bookings/execute",
+    "CANCEL": "/actions/cancellations/execute",
+    "RESCHEDULE": "/actions/reschedules/execute",
+}
+
+WORKFLOW_LABELS = {
+    "BOOK": "Book appointment",
+    "CANCEL": "Cancel appointment",
+    "RESCHEDULE": "Reschedule appointment",
+}
+
 
 st.set_page_config(
     page_title="CareConnect AI",
@@ -26,14 +38,9 @@ st.set_page_config(
 )
 
 
-# --------------------------------------------------
-# STYLING
-# --------------------------------------------------
-
 st.markdown(
     """
     <style>
-
     .stApp {
         background: #F5F8FC;
         color: #172B4D;
@@ -47,52 +54,29 @@ st.markdown(
 
     h1, h2, h3 {
         color: #172B4D;
-        font-family: "Segoe UI", sans-serif;
-        font-weight: 700;
     }
-
-    p {
-        line-height: 1.65;
-    }
-
-    /* Sidebar */
 
     [data-testid="stSidebar"] {
         background: #FFFFFF;
         border-right: 1px solid #E2E8F0;
     }
 
-    [data-testid="stSidebar"] h1,
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3 {
+    [data-testid="stSidebar"] * {
         color: #172B4D;
     }
 
-    /* Input fields */
-
-    div[data-baseweb="input"] {
-        background: #FFFFFF !important;
-        border-radius: 10px !important;
+    [data-testid="stChatMessage"] {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 12px;
     }
-
-    div[data-baseweb="input"] input {
-        background: #FFFFFF !important;
-        color: #172B4D !important;
-        -webkit-text-fill-color: #172B4D !important;
-        caret-color: #087F8C !important;
-    }
-
-    div[data-baseweb="input"] input::placeholder {
-        color: #718096 !important;
-        -webkit-text-fill-color: #718096 !important;
-    }
-
-    /* Chat input */
 
     [data-testid="stChatInput"] {
         background: #FFFFFF !important;
         border: 1px solid #CBD5E1 !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
     }
 
     [data-testid="stChatInput"] textarea {
@@ -100,7 +84,6 @@ st.markdown(
         color: #172B4D !important;
         -webkit-text-fill-color: #172B4D !important;
         caret-color: #087F8C !important;
-        font-size: 15px !important;
     }
 
     [data-testid="stChatInput"] textarea::placeholder {
@@ -108,46 +91,11 @@ st.markdown(
         -webkit-text-fill-color: #718096 !important;
     }
 
-    [data-testid="stChatInput"] textarea:focus {
-        outline: none !important;
-    }
-
-    /* Chat messages */
-
-    [data-testid="stChatMessage"] {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
-        border-radius: 14px;
-        padding: 18px;
-        margin-bottom: 14px;
-        box-shadow: 0 2px 8px rgba(20, 40, 80, 0.035);
-    }
-
-    [data-testid="stChatMessage"] p,
-    [data-testid="stChatMessage"] li {
+    div[data-baseweb="input"] input {
+        background: #FFFFFF !important;
         color: #172B4D !important;
+        -webkit-text-fill-color: #172B4D !important;
     }
-
-    /* Buttons */
-
-    div.stButton > button {
-        border-radius: 10px;
-        font-weight: 600;
-        min-height: 42px;
-    }
-
-    div.stButton > button[kind="primary"] {
-        background: #087F8C;
-        color: #FFFFFF;
-        border: none;
-    }
-
-    div.stButton > button[kind="primary"]:hover {
-        background: #066873;
-        color: #FFFFFF;
-    }
-
-    /* Hero */
 
     .hero {
         background: linear-gradient(
@@ -156,91 +104,51 @@ st.markdown(
             #138B96
         );
         border-radius: 18px;
-        padding: 30px 34px;
-        margin-bottom: 25px;
-        box-shadow: 0 8px 25px rgba(13, 100, 116, 0.12);
+        padding: 28px 32px;
+        margin-bottom: 24px;
     }
 
-    .hero-title {
-        font-size: 30px;
-        font-weight: 750;
+    .hero h1 {
         color: #FFFFFF;
-        margin-bottom: 10px;
-    }
-
-    .hero-subtitle {
-        font-size: 15px;
-        color: #E5F7F8;
-        line-height: 1.7;
-    }
-
-    /* Booking card */
-
-    .booking-card {
-        background: #FFFFFF;
-        border: 1px solid #D7E7EA;
-        border-left: 5px solid #087F8C;
-        border-radius: 14px;
-        padding: 22px;
-        margin-top: 20px;
-        margin-bottom: 18px;
-        box-shadow: 0 5px 18px rgba(20, 60, 80, 0.05);
-    }
-
-    .booking-heading {
-        color: #172B4D;
-        font-size: 21px;
-        font-weight: 700;
-        margin-bottom: 12px;
-    }
-
-    .booking-status {
-        display: inline-block;
-        background: #FFF4D6;
-        color: #926500;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 700;
-        margin-bottom: 14px;
-    }
-
-    .booking-detail {
-        color: #425466;
-        font-size: 15px;
         margin-bottom: 8px;
     }
 
-    /* Footer */
-
-    .app-footer {
-        text-align: center;
-        color: #718096;
-        font-size: 12px;
-        margin-top: 35px;
-        padding-top: 18px;
-        border-top: 1px solid #E2E8F0;
+    .hero p {
+        color: #E5F7F8;
+        margin-bottom: 0;
     }
 
+    div.stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+    }
+
+    div.stButton > button[kind="primary"] {
+        background: #087F8C;
+        color: #FFFFFF;
+        border: none;
+    }
+
+    .workflow-heading {
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: #64748B;
+        margin-bottom: 12px;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-# --------------------------------------------------
-# API CLIENT
-# --------------------------------------------------
-
 class ApiError(Exception):
-
     def __init__(self, message, status_code=None):
         super().__init__(message)
         self.status_code = status_code
 
 
 def api_request(method, path, token=None, payload=None):
-
     headers = {}
 
     if token:
@@ -248,69 +156,57 @@ def api_request(method, path, token=None, payload=None):
 
     try:
         with httpx.Client(
-            timeout=httpx.Timeout(
-                180.0,
-                connect=10.0,
-            ),
+            timeout=httpx.Timeout(180.0, connect=10.0),
             follow_redirects=False,
         ) as client:
-
             response = client.request(
-                method=method,
-                url=f"{API_URL}{path}",
+                method,
+                f"{API_URL}{path}",
                 headers=headers,
                 json=payload,
             )
 
     except httpx.TimeoutException as error:
         raise ApiError(
-            "Request timed out. The operation may have reached "
-            "the backend. Do not automatically retry."
+            "Request timed out. The result may be uncertain. "
+            "Do not automatically retry a state-changing operation."
         ) from error
 
     except httpx.RequestError as error:
         raise ApiError(
-            "Cannot connect to FastAPI. Check the backend server."
+            "Unable to connect to FastAPI."
         ) from error
 
     if not response.is_success:
-
         try:
             detail = response.json().get("detail")
         except (ValueError, AttributeError):
             detail = None
 
         if not isinstance(detail, str):
-            detail = f"Backend returned HTTP {response.status_code}"
+            detail = f"HTTP {response.status_code}"
 
-        raise ApiError(
-            detail,
-            status_code=response.status_code,
-        )
+        raise ApiError(detail, response.status_code)
 
     try:
         return response.json()
-
     except ValueError as error:
         raise ApiError(
-            "Invalid response received from backend."
+            "Unexpected response from FastAPI."
         ) from error
 
 
-# --------------------------------------------------
-# SESSION STATE
-# --------------------------------------------------
-
 def initialize_state():
-
     defaults = {
         "token": None,
         "customer": None,
-        "sql_session_id": None,
+        "session_id": None,
         "messages": [],
         "pending_action": None,
+        "workflow": None,
         "chat_blocked": False,
         "execution_uncertain": False,
+        "safety_paused": False,
         "notice": None,
     }
 
@@ -320,68 +216,69 @@ def initialize_state():
 
 
 def clear_login():
-
     st.session_state.token = None
     st.session_state.customer = None
-    st.session_state.sql_session_id = None
+    st.session_state.session_id = None
     st.session_state.messages = []
     st.session_state.pending_action = None
+    st.session_state.workflow = None
     st.session_state.chat_blocked = False
     st.session_state.execution_uncertain = False
+    st.session_state.safety_paused = False
 
 
 def handle_error(error):
-
     if error.status_code == 401:
-
         clear_login()
-
         st.session_state.notice = (
             "Your login has expired. Please sign in again."
         )
-
         st.rerun()
 
     st.error(str(error))
 
 
-# --------------------------------------------------
-# SESSION OPERATIONS
-# --------------------------------------------------
-
 def create_session():
-
     result = api_request(
         "POST",
         "/sessions",
         token=st.session_state.token,
     )
 
-    st.session_state.sql_session_id = result["session_id"]
+    st.session_state.session_id = result["session_id"]
     st.session_state.messages = []
     st.session_state.pending_action = None
+    st.session_state.workflow = None
     st.session_state.chat_blocked = False
     st.session_state.execution_uncertain = False
+    st.session_state.safety_paused = False
+
+
+def select_workflow(workflow):
+    result = api_request(
+        "POST",
+        "/workflow/select",
+        token=st.session_state.token,
+        payload={
+            "session_id": st.session_state.session_id,
+            "workflow": workflow,
+        },
+    )
+
+    st.session_state.workflow = result["current_workflow"]
 
 
 def refresh_pending_action():
-
-    session_id = st.session_state.sql_session_id
-
-    if not session_id:
-        return
-
     result = api_request(
         "GET",
-        f"/actions/pending/{session_id}",
+        f"/actions/pending/{st.session_state.session_id}",
         token=st.session_state.token,
     )
 
     st.session_state.pending_action = result.get("action")
 
 
-def format_local_time(value):
-
+def format_time(value):
     if not value:
         return "Not available"
 
@@ -389,7 +286,7 @@ def format_local_time(value):
         parsed = datetime.fromisoformat(value)
 
         if parsed.tzinfo is None:
-            return value
+            return "Not available"
 
         return parsed.astimezone(IST).strftime(
             "%d %B %Y, %I:%M %p IST"
@@ -399,53 +296,32 @@ def format_local_time(value):
         return "Not available"
 
 
-# --------------------------------------------------
-# LOGIN PAGE
-# --------------------------------------------------
-
 def render_login():
-
     st.markdown(
         """
         <div class="hero">
-            <div class="hero-title">
-                CareConnect AI
-            </div>
-            <div class="hero-subtitle">
-                Your intelligent healthcare receptionist.
-                Find appointments and manage your healthcare
-                journey through natural conversation.
-            </div>
+            <h1>CareConnect AI</h1>
+            <p>Your intelligent healthcare receptionist.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    left, center, right = st.columns([1, 1.4, 1])
+    _, center, _ = st.columns([1, 1.5, 1])
 
     with center:
-
-        st.markdown("## Welcome back")
-
-        st.caption(
-            "Sign in using your registered account."
-        )
+        st.subheader("Welcome back")
+        st.caption("Sign in with your registered account.")
 
         if st.session_state.notice:
             st.info(st.session_state.notice)
             st.session_state.notice = None
 
         with st.form("login_form"):
-
-            username = st.text_input(
-                "Username",
-                placeholder="Enter your username",
-            )
-
+            username = st.text_input("Username")
             password = st.text_input(
                 "Password",
                 type="password",
-                placeholder="Enter your password",
             )
 
             submitted = st.form_submit_button(
@@ -455,17 +331,12 @@ def render_login():
             )
 
         if submitted:
-
             if not username.strip() or not password:
-                st.error(
-                    "Please enter your username and password."
-                )
+                st.error("Enter your username and password.")
                 return
 
             try:
-
-                with st.spinner("Signing you in..."):
-
+                with st.spinner("Signing in..."):
                     login = api_request(
                         "POST",
                         "/auth/login",
@@ -485,50 +356,78 @@ def render_login():
 
                 st.session_state.token = token
                 st.session_state.customer = customer
-
                 st.rerun()
 
             except ApiError as error:
                 st.error(str(error))
 
 
-# --------------------------------------------------
-# SIDEBAR
-# --------------------------------------------------
-
 def render_sidebar():
-
     customer = st.session_state.customer
 
     with st.sidebar:
-
         st.title("CareConnect AI")
-
-        st.caption(
-            "Intelligent Telehealth Assistant"
-        )
+        st.caption("AI-powered appointment assistant")
 
         st.divider()
 
-        st.markdown("### Account")
-
-        st.write(
-            f"**{customer['username']}**"
-        )
-
-        st.caption(
-            f"Customer: {customer['customer_code']}"
-        )
+        st.write(f"**{customer['username']}**")
+        st.caption(customer["customer_code"])
 
         st.divider()
 
-        st.markdown("### Conversation")
+        if st.session_state.session_id:
+            st.markdown(
+                '<div class="workflow-heading">'
+                'APPOINTMENT ACTIONS'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+            disabled = (
+                st.session_state.pending_action is not None
+                or st.session_state.execution_uncertain
+                or st.session_state.chat_blocked
+                or st.session_state.safety_paused
+            )
+
+            for workflow, label in WORKFLOW_LABELS.items():
+                selected = (
+                    st.session_state.workflow == workflow
+                )
+
+                button_label = (
+                    f"{label} — Selected"
+                    if selected
+                    else label
+                )
+
+                if st.button(
+                    button_label,
+                    key=f"workflow_{workflow}",
+                    use_container_width=True,
+                    type="primary" if selected else "secondary",
+                    disabled=disabled,
+                ):
+                    try:
+                        select_workflow(workflow)
+                        st.rerun()
+
+                    except ApiError as error:
+                        handle_error(error)
+
+            if st.session_state.workflow:
+                st.caption(
+                    "Current workflow: "
+                    + st.session_state.workflow
+                )
+
+            st.divider()
 
         if st.button(
             "New conversation",
             use_container_width=True,
         ):
-
             try:
                 create_session()
                 st.rerun()
@@ -536,170 +435,56 @@ def render_sidebar():
             except ApiError as error:
                 handle_error(error)
 
-        if st.session_state.sql_session_id:
-            st.success("Session active")
-
-        st.divider()
-
-        st.markdown("### Quick information")
-
-        st.caption(
-            "Search doctor availability and prepare "
-            "appointments through the AI assistant."
-        )
-
-        st.divider()
-
         if st.button(
             "Sign out",
             use_container_width=True,
         ):
-
-            session_id = st.session_state.sql_session_id
-
-            if session_id:
-
+            if st.session_state.session_id:
                 try:
                     api_request(
                         "POST",
-                        f"/sessions/{session_id}/close",
+                        (
+                            f"/sessions/"
+                            f"{st.session_state.session_id}/close"
+                        ),
                         token=st.session_state.token,
                     )
-
                 except ApiError:
                     pass
 
             clear_login()
             st.rerun()
 
+        st.divider()
         st.caption(
-            "Capstone demonstration using synthetic data."
+            "Synthetic-data capstone. "
+            "Not intended for real patient care."
         )
 
 
-# --------------------------------------------------
-# BOOKING CONFIRMATION
-# --------------------------------------------------
-
-def render_booking_confirmation(action):
-
-    if action.get("action_type") != "BOOK":
-        return
-
-    st.markdown(
-        """
-        <div class="booking-card">
-            <div class="booking-status">
-                AWAITING CONFIRMATION
-            </div>
-            <div class="booking-heading">
-                Review your appointment
-            </div>
-            <div class="booking-detail">
-                Please verify the appointment details below.
-                Your slot is not reserved until booking succeeds.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        st.markdown("**Doctor**")
-        st.write(
-            action.get("display_name") or "Not available"
-        )
-
-        st.markdown("**Specialty**")
-        st.write(
-            action.get("specialty_name") or "Not available"
-        )
-
-        st.markdown("**Location**")
-        st.write(
-            action.get("city") or "Not available"
-        )
-
-    with col2:
-
-        st.markdown("**Appointment starts**")
-        st.write(
-            format_local_time(
-                action.get("starts_at_local")
-            )
-        )
-
-        st.markdown("**Appointment ends**")
-        st.write(
-            format_local_time(
-                action.get("ends_at_local")
-            )
-        )
-
-        st.markdown("**Slot ID**")
-        st.write(
-            action.get("selected_slot_id")
-        )
-
-    st.caption(
-        "Confirmation deadline: "
-        + format_local_time(
-            action.get("expires_at_utc")
-        )
-    )
-
-    if st.session_state.execution_uncertain:
-
+def execute_pending_action(action):
+    if st.session_state.safety_paused:
         st.error(
-            "The previous booking result is uncertain. "
-            "Please check the backend before retrying."
+            "Appointment actions are paused after "
+            "a potential emergency message."
         )
-
         return
 
-    confirm_col, cancel_col = st.columns(2)
+    action_type = action["action_type"]
+    endpoint = EXECUTION_ENDPOINTS.get(action_type)
 
-    with confirm_col:
-
-        if st.button(
-            "Confirm booking",
-            type="primary",
-            use_container_width=True,
-        ):
-
-            execute_booking(action)
-
-    with cancel_col:
-
-        if st.button(
-            "Not now",
-            use_container_width=True,
-        ):
-
-            st.info(
-                "Booking was not executed. "
-                "The pending action remains in SQL until "
-                "it expires or is superseded."
-            )
-
-
-def execute_booking(action):
+    if endpoint is None:
+        st.error("Unsupported action type.")
+        return
 
     try:
-
-        with st.spinner("Confirming appointment..."):
-
+        with st.spinner("Processing appointment..."):
             result = api_request(
                 "POST",
-                "/actions/bookings/execute",
+                endpoint,
                 token=st.session_state.token,
                 payload={
-                    "session_id": (
-                        st.session_state.sql_session_id
-                    ),
+                    "session_id": st.session_state.session_id,
                     "action_id": action["action_id"],
                     "confirmed": True,
                 },
@@ -709,19 +494,24 @@ def execute_booking(action):
 
         st.session_state.pending_action = None
         st.session_state.execution_uncertain = False
+        st.session_state.workflow = None
+
+        verbs = {
+            "BOOK": "booked",
+            "CANCEL": "cancelled",
+            "RESCHEDULE": "rescheduled",
+        }
 
         if result.get("already_processed"):
-
             reply = (
-                f"Appointment {appointment_id} was already "
-                "processed. No duplicate booking was created."
+                f"Appointment {appointment_id} "
+                "was already processed. "
+                "No duplicate change was made."
             )
-
         else:
-
             reply = (
-                f"Your appointment is confirmed. "
-                f"Appointment ID: {appointment_id}."
+                f"Appointment {appointment_id} "
+                f"successfully {verbs[action_type]}."
             )
 
         st.session_state.messages.append(
@@ -729,50 +519,187 @@ def execute_booking(action):
                 "role": "assistant",
                 "content": reply,
                 "tool_calls": [],
+                "safety_status": "NORMAL",
             }
         )
 
         st.session_state.notice = reply
-
         st.rerun()
 
     except ApiError as error:
-
-        if error.status_code is None or error.status_code >= 500:
+        if (
+            error.status_code is None
+            or error.status_code >= 500
+        ):
             st.session_state.execution_uncertain = True
 
         handle_error(error)
 
 
-# --------------------------------------------------
-# CHAT
-# --------------------------------------------------
+def render_confirmation(action):
+    action_type = action.get("action_type")
+
+    if action_type not in EXECUTION_ENDPOINTS:
+        st.error("Unsupported pending action.")
+        return
+
+    st.divider()
+    st.subheader(
+        f"Review {action_type.lower()} request"
+    )
+
+    st.info(
+        "This operation has not been executed yet."
+    )
+
+    st.write(
+        "**Doctor:**",
+        action.get("display_name") or "Not available",
+    )
+
+    st.write(
+        "**Specialty:**",
+        action.get("specialty_name") or "Not available",
+    )
+
+    st.write(
+        "**City:**",
+        action.get("city") or "Not available",
+    )
+
+    if action_type == "BOOK":
+        st.write(
+            "**Proposed appointment:**",
+            format_time(
+                action.get("target_starts_at_local")
+            ),
+        )
+
+    elif action_type == "CANCEL":
+        st.write(
+            "**Appointment ID:**",
+            action.get("appointment_id"),
+        )
+
+        st.write(
+            "**Current appointment:**",
+            format_time(
+                action.get("current_starts_at_local")
+            ),
+        )
+
+    elif action_type == "RESCHEDULE":
+        st.write(
+            "**Appointment ID:**",
+            action.get("appointment_id"),
+        )
+
+        st.write(
+            "**Current appointment:**",
+            format_time(
+                action.get("current_starts_at_local")
+            ),
+        )
+
+        st.write(
+            "**Proposed appointment:**",
+            format_time(
+                action.get("target_starts_at_local")
+            ),
+        )
+
+    st.caption(
+        "Action expires: "
+        + format_time(action.get("expires_at_utc"))
+    )
+
+    if (
+        st.session_state.execution_uncertain
+        or st.session_state.safety_paused
+    ):
+        st.error(
+            "Confirmation is unavailable while "
+            "the conversation is paused."
+        )
+        return
+
+    required = {
+        "BOOK": ["target_starts_at_local"],
+        "CANCEL": [
+            "appointment_id",
+            "current_starts_at_local",
+        ],
+        "RESCHEDULE": [
+            "appointment_id",
+            "current_starts_at_local",
+            "target_starts_at_local",
+        ],
+    }
+
+    if any(
+        not action.get(field)
+        for field in required[action_type]
+    ):
+        st.error(
+            "Required appointment details are missing. "
+            "Confirmation is disabled."
+        )
+        return
+
+    expires_at = action.get("expires_at_utc")
+
+    try:
+        expiry = datetime.fromisoformat(expires_at)
+        now = datetime.now(expiry.tzinfo)
+
+        if now >= expiry:
+            st.error(
+                "This action has expired. "
+                "Start a new conversation and prepare it again."
+            )
+            return
+
+    except (TypeError, ValueError, AttributeError):
+        st.error(
+            "Action expiry could not be verified."
+        )
+        return
+
+    if st.button(
+        f"Confirm {action_type.lower()}",
+        type="primary",
+        use_container_width=True,
+        key="confirm_pending_action",
+    ):
+        execute_pending_action(action)
+
 
 def process_message(message):
-
     st.session_state.messages.append(
         {
             "role": "user",
             "content": message,
             "tool_calls": [],
+            "safety_status": "NORMAL",
         }
     )
 
     try:
-
         with st.spinner("Assistant is responding..."):
-
             response = api_request(
                 "POST",
                 "/chat",
                 token=st.session_state.token,
                 payload={
-                    "session_id": (
-                        st.session_state.sql_session_id
-                    ),
+                    "session_id": st.session_state.session_id,
                     "message": message,
                 },
             )
+
+        safety_status = response.get(
+            "safety_status",
+            "NORMAL",
+        )
 
         st.session_state.messages.append(
             {
@@ -782,88 +709,90 @@ def process_message(message):
                     "tool_calls",
                     [],
                 ),
+                "safety_status": safety_status,
             }
         )
 
-        refresh_pending_action()
+        if safety_status == "POTENTIAL_EMERGENCY":
+            st.session_state.safety_paused = True
+            st.session_state.pending_action = None
+            st.session_state.workflow = None
+            st.rerun()
 
+        refresh_pending_action()
         st.rerun()
 
     except ApiError as error:
-
         st.session_state.chat_blocked = True
         handle_error(error)
 
 
 def render_chat():
-
     st.markdown(
         """
         <div class="hero">
-            <div class="hero-title">
-                Your AI Healthcare Receptionist
-            </div>
-            <div class="hero-subtitle">
-                Search available appointments, explore doctors
-                and prepare bookings through natural conversation.
-            </div>
+            <h1>Your AI Healthcare Receptionist</h1>
+            <p>
+                Search, book, cancel and reschedule
+                appointments through natural conversation.
+            </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     if st.session_state.notice:
-
         st.success(st.session_state.notice)
         st.session_state.notice = None
 
     if not st.session_state.messages:
-
-        st.markdown("### Start with a question")
-
         st.info(
-            "Try asking: Find dermatology appointments "
-            "in Pune tomorrow."
+            "Choose Book, Cancel or Reschedule "
+            "from the sidebar, then start chatting."
         )
 
     for message in st.session_state.messages:
-
         with st.chat_message(message["role"]):
+            if (
+                message.get("safety_status")
+                == "POTENTIAL_EMERGENCY"
+            ):
+                st.error(
+                    "Potential medical emergency detected"
+                )
 
             st.markdown(message["content"])
 
             if message.get("tool_calls"):
-
                 with st.expander("Tool activity"):
                     st.json(message["tool_calls"])
 
-    action = st.session_state.pending_action
+    if st.session_state.safety_paused:
+        st.error(
+            "Normal appointment operations are paused "
+            "following a potential emergency message. "
+            "Seek appropriate emergency assistance. "
+            "A new conversation can be started when appropriate."
+        )
 
-    if action:
-
-        if action.get("action_type") == "BOOK":
-            render_booking_confirmation(action)
-
-        else:
-            st.info(
-                "A pending action exists. "
-                "Booking confirmation is currently "
-                "the only action connected to this UI."
-            )
+    elif st.session_state.pending_action:
+        render_confirmation(
+            st.session_state.pending_action
+        )
 
     if st.session_state.chat_blocked:
-
         st.warning(
-            "This conversation is paused after an error. "
-            "Start a new conversation or inspect the backend."
+            "Conversation paused after an error. "
+            "Check backend logs before continuing."
         )
 
     prompt = st.chat_input(
-        "Type your message here...",
+        "Ask your healthcare assistant...",
         max_chars=4000,
         disabled=(
             st.session_state.chat_blocked
             or st.session_state.execution_uncertain
+            or st.session_state.safety_paused
             or st.session_state.pending_action is not None
         ),
     )
@@ -872,33 +801,23 @@ def render_chat():
         process_message(prompt.strip())
 
 
-# --------------------------------------------------
-# APPLICATION
-# --------------------------------------------------
-
 initialize_state()
 
 if not st.session_state.token:
-
     render_login()
     st.stop()
 
-
 render_sidebar()
 
-
-if not st.session_state.sql_session_id:
-
+if not st.session_state.session_id:
     st.markdown(
         """
         <div class="hero">
-            <div class="hero-title">
-                Welcome to CareConnect AI
-            </div>
-            <div class="hero-subtitle">
+            <h1>Welcome to CareConnect AI</h1>
+            <p>
                 Start a conversation with your intelligent
                 telehealth receptionist.
-            </div>
+            </p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -908,7 +827,6 @@ if not st.session_state.sql_session_id:
         "Start conversation",
         type="primary",
     ):
-
         try:
             create_session()
             st.rerun()
@@ -918,16 +836,4 @@ if not st.session_state.sql_session_id:
 
     st.stop()
 
-
 render_chat()
-
-
-st.markdown(
-    """
-    <div class="app-footer">
-        CareConnect AI | Powered by Microsoft Foundry,
-        FastAPI, MCP and Azure SQL
-    </div>
-    """,
-    unsafe_allow_html=True,
-)

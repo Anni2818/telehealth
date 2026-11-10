@@ -4,6 +4,10 @@ from datetime import date
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
+from app.repositories.workflow_repository import (
+    get_session_workflow,
+)
+
 from app.repositories.mcp_context_repository import (
     resolve_mcp_context,
 )
@@ -155,6 +159,16 @@ def prepare_booking(
             "Check the application before preparing another action."
         ) from error
 
+    workflow = get_session_workflow(
+    session_id=context["session_id"],
+    customer_id=context["customer_id"],
+    )
+
+    if workflow != "BOOK":
+        raise ToolError(
+            "BOOK workflow is not selected."
+        )
+
 
 @mcp.tool()
 def prepare_cancellation(
@@ -197,6 +211,16 @@ def prepare_cancellation(
             "Cancellation could not be prepared. "
             "Check the application before retrying."
         ) from error
+
+    workflow = get_session_workflow(
+    session_id=context["session_id"],
+    customer_id=context["customer_id"],
+    )
+
+    if workflow != "CANCEL":
+        raise ToolError(
+            "CANCEL workflow is not selected."
+        )
 
 
 @mcp.tool()
@@ -248,6 +272,16 @@ def prepare_reschedule(
             "Rescheduling could not be prepared. "
             "Check the application before retrying."
         ) from error
+
+    workflow = get_session_workflow(
+    session_id=context["session_id"],
+    customer_id=context["customer_id"],
+    )
+
+    if workflow != "RESCHEDULE":
+        raise ToolError(
+            "RESCHEDULE workflow is not selected."
+        )
 
 
 if __name__ == "__main__":
