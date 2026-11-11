@@ -12,6 +12,10 @@ from app.services.emergency_service import (
     screen_emergency,
 )
 
+from app.services.semantic_emergency_service import (
+    screen_semantic_emergency,
+)
+
 from app.services.foundry_service import (
     open_foundry_client,
     send_chat_turn,
@@ -45,6 +49,19 @@ def process_chat(
                 "tool_calls": [],
                 "safety_status": safety_result.status,
                 "safety_category": safety_result.category,
+                "current_workflow": None,
+            }
+
+        semantic_result = screen_semantic_emergency(message)
+
+        if semantic_result is not None and semantic_result.status != "NORMAL":
+            return {
+                "session_id": str(session_id),
+                "reply": semantic_result.reply,
+                "response_id": None,
+                "tool_calls": [],
+                "safety_status": semantic_result.status,
+                "safety_category": semantic_result.category,
                 "current_workflow": None,
             }
 
