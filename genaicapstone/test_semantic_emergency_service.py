@@ -95,6 +95,151 @@ class SemanticEmergencyTests(unittest.TestCase):
 
         self.assertEqual(result.status, "UNCERTAIN")
 
+    def test_missing_endpoint_or_api_key_fails_closed(self):
+        with patch.dict(os.environ, {
+            "AZURE_OPENAI_ENDPOINT": "",
+            "AZURE_OPENAI_API_KEY": "",
+        }, clear=False):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+
+    def test_normal_status_with_emergency_category_fails_closed(self):
+        client = self.mock_client({
+            "status": "NORMAL",
+            "category": "CHEST_PAIN",
+        })
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_potential_emergency_with_none_category_fails_closed(self):
+        client = self.mock_client({
+            "status": "POTENTIAL_EMERGENCY",
+            "category": "NONE",
+        })
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_malformed_json_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content="not valid json"))
+        ]
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_empty_model_response_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content=None))
+        ]
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_provider_timeout_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.side_effect = TimeoutError("request timed out")
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_provider_authentication_error_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.side_effect = RuntimeError(
+            "provider authentication failed"
+        )
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_malformed_json_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content="not valid json"))
+        ]
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_empty_model_response_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices = [
+            MagicMock(message=MagicMock(content=None))
+        ]
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_provider_timeout_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.side_effect = TimeoutError("request timed out")
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
+    def test_provider_authentication_error_fails_closed_and_closes_client(self):
+        client = MagicMock()
+        client.chat.completions.create.side_effect = RuntimeError(
+            "provider authentication failed"
+        )
+        with patch(
+            "app.services.semantic_emergency_service._build_client",
+            return_value=client,
+        ):
+            result = screen_semantic_emergency("I feel strange.")
+
+        self.assertEqual(result.status, "UNCERTAIN")
+        client.close.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
