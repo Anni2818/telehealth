@@ -147,6 +147,14 @@ def screen_semantic_emergency(message):
         if status not in ALLOWED_STATUSES or category not in ALLOWED_CATEGORIES:
             return _uncertain()
 
+        # Reject contradictory structured output rather than allowing a
+        # category/status mismatch to silently pass the safety gate.
+        if (
+            (status == "NORMAL" and category != "NONE")
+            or (status == "POTENTIAL_EMERGENCY" and category == "NONE")
+        ):
+            return _uncertain()
+
         if status == "NORMAL":
             return SemanticSafetyResult("NORMAL", "NONE", "")
 

@@ -1,0 +1,41 @@
+name: Python tests
+
+on:
+  push:
+    branches:
+      - main
+      - semantic-emergency-screening
+      - semantic-emergency-screening-integration-tests
+  pull_request:
+    branches:
+      - main
+      - semantic-emergency-screening
+
+jobs:
+  unit-and-integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install project dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run test discovery
+        working-directory: genaicapstone
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -v
+
+      - name: Compile application modules
+        working-directory: genaicapstone
+        env:
+          PYTHONPATH: .
+        run: python -m compileall -q app
